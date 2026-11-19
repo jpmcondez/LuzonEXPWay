@@ -1,0 +1,6 @@
+system,from,to,class1,class2,class3,note
+NLEX-SCTEX,Balintawak,Dau,411,,,"Expressway.PH, TRB matrix 1 Feb 2026"
+NLEX-SCTEX,Balintawak,TPLEX junction,670,,,"Expressway.PH: Balintawak to Tarlac, TRB 1 Feb 2026"
+TPLEX,NLEX-SCTEX junction,Rosario,311,,,"Expressway.PH: La Paz to Rosario, TRB 1 Feb 2026"
+STAR,SLEX junction,Batangas City,135,,,"Expressway.PH: STAR Calamba to Batangas, TRB 1 Feb 2026"
+SLEX,Magallanes,Calamba,244,,,"Expressway.PH, TRB 1 Feb 2026 (Magallanes is not a plaza in the map data yet)"

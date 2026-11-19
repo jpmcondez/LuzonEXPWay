@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Luzon Expressway RFID & Toll Map: Autosweep vs Easytrip</title>
+<meta name="description" content="Interactive street map of Luzon expressways colored by RFID network, with labelled toll plazas, entry-to-all-exits toll estimates and an editable fare table.">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f6f5f1;--panel:#fff;--ink:#1d1d1b;--muted:#6b6a64;--faint:#9a988f;--line:#e2e0d8;
+  --route:#7b3fd1;--route-bg:#f1eafc;--warn-bg:#fff4dc;--warn:#8a5a00;
+  --easy:#2a72c9;--easy-bg:#e7f0fb;--auto:#d9532a;--auto-bg:#fcebe4;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#191918;--panel:#232321;--ink:#ecebe6;--muted:#a9a79f;--faint:#7c7a73;--line:#383733;
+  --route:#b48cff;--route-bg:#2b2238;--warn-bg:#3a2e14;--warn:#f0c46b;
+  --easy:#5b9cf0;--easy-bg:#1b2a3d;--auto:#f07a4f;--auto-bg:#3a231a;
+}}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:Inter,system-ui,sans-serif}
+button,input,select,textarea{font-family:inherit}
+.app{display:grid;grid-template-columns:minmax(0,1fr) 380px;height:100vh}
+#map{height:100%;background:#e8e6df}
+aside{background:var(--panel);border-left:1px solid var(--line);overflow-y:auto;padding:18px 18px 28px}
+h1{font-size:18px;font-weight:600;margin:0 0 4px;line-height:1.3}
+.sub{font-size:12.5px;color:var(--muted);line-height:1.5;margin:0 0 14px}
+section{border-top:1px solid var(--line);padding:14px 0 6px}
+section h2{font-size:13px;font-weight:600;margin:0 0 10px}
+.field{position:relative;margin-bottom:8px}
+.field label{position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:11px;font-weight:600;color:var(--muted)}
+.field input{width:100%;padding:9px 34px 9px 50px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font-size:13.5px}
+.field input:focus{outline:2px solid var(--route);outline-offset:-1px}
+.field .clr{position:absolute;right:6px;top:50%;transform:translateY(-50%);border:0;background:none;color:var(--faint);font-size:16px;cursor:pointer;padding:4px 6px}
+.sugg{position:absolute;z-index:1000;left:0;right:0;top:100%;margin-top:2px;background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.14);max-height:260px;overflow-y:auto;display:none}
+.sugg div{padding:7px 10px;font-size:13px;cursor:pointer;display:flex;justify-content:space-between;gap:8px}
+.sugg div.act,.sugg div:hover{background:var(--route-bg)}
+.sugg small{color:var(--muted);font-size:11.5px;white-space:nowrap}
+.row{display:flex;gap:8px;align-items:center;margin:2px 0 10px;flex-wrap:wrap}
+.btn{border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:8px;padding:7px 11px;font-size:12.5px;font-weight:500;cursor:pointer}
+.btn.primary{background:var(--route);border-color:var(--route);color:#fff}
+.btn.sm{padding:4px 8px;font-size:12px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{border:0;background:var(--panel);color:var(--ink);font-size:12px;padding:6px 9px;cursor:pointer}
+.seg button.on{background:var(--route);color:#fff}
+.hint{font-size:12px;color:var(--muted);line-height:1.5;margin:4px 0 10px}
+.result{border-radius:10px;background:var(--route-bg);padding:12px;margin:4px 0 10px}
+.result .top{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.big{font-size:24px;font-weight:600;font-variant-numeric:tabular-nums}
+.verdict{margin:8px 0;font-size:12.5px;font-weight:500;padding:7px 10px;border-radius:8px}
+.verdict.easy{background:var(--easy-bg);color:var(--easy)}.verdict.auto{background:var(--auto-bg);color:var(--auto)}.verdict.both{background:var(--warn-bg);color:var(--warn)}.verdict.free{background:var(--bg);color:var(--muted)}
+.legs{list-style:none;margin:6px 0 0;padding:0}
+.legs li{padding:7px 0;border-top:1px solid rgba(127,127,127,.2);font-size:12.5px}
+.legs .l1{display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.legs .l1 b{font-weight:600}
+.legs .l2{color:var(--muted);font-size:11.5px;margin-top:2px}
+.legs .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px}
+.legs .amt{font-variant-numeric:tabular-nums;font-weight:600;white-space:nowrap}
+.legs .amt.miss{color:var(--warn)}
+.addfare{display:flex;gap:6px;margin-top:6px;align-items:center}
+.addfare input{width:100px;padding:5px 8px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink);font-size:12.5px}
+.small{font-size:11.5px;color:var(--muted);line-height:1.5}
+.exlist{list-style:none;margin:0;padding:0;max-height:300px;overflow-y:auto;border:1px solid var(--line);border-radius:8px}
+.exlist li{display:grid;grid-template-columns:1fr auto auto;gap:10px;padding:6px 10px;font-size:12.5px;border-top:1px solid var(--line);cursor:pointer}
+.exlist li:first-child{border-top:0}
+.exlist li:hover{background:var(--route-bg)}
+.exlist .km{color:var(--muted);font-variant-numeric:tabular-nums}
+.exlist .p{font-weight:600;font-variant-numeric:tabular-nums;min-width:56px;text-align:right}
+.exlist .p.miss{color:var(--faint);font-weight:500}
+.net{border-radius:10px;padding:9px 10px 4px;margin-bottom:8px}
+.net.easy{background:var(--easy-bg)}.net.auto{background:var(--auto-bg)}.net.free{border:1px solid var(--line);padding-bottom:8px}
+.nethead{display:flex;align-items:center;gap:9px;cursor:pointer;user-select:none}
+.nethead .sw{width:28px;height:10px;flex:none}
+.nethead b{font-size:13.5px;font-weight:600}
+.nethead .tot{margin-left:auto;font-size:12px;color:var(--muted)}
+.eye{font-size:10.5px;color:var(--muted);border:1px solid var(--line);background:var(--panel);border-radius:6px;padding:2px 6px}
+.net.off .rows,.net.off .nethead b{opacity:.4}
+.rows{margin:6px 0 0;padding:0;list-style:none}
+.rows li{display:flex;justify-content:space-between;font-size:12.5px;padding:4px;border-top:1px solid rgba(127,127,127,.15);cursor:pointer;border-radius:4px}
+.rows li:hover{background:rgba(127,127,127,.12)}
+.rows li span:last-child{color:var(--muted)}
+.opts label{display:flex;align-items:center;gap:8px;margin:5px 0;cursor:pointer;font-size:12.5px}
+.note{font-size:11.5px;color:var(--muted);line-height:1.55;margin:10px 0 0}
+.leaflet-tooltip.pl{background:none;border:0;box-shadow:none;padding:0;font:500 11px Inter,sans-serif;color:#222;text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 2px #fff;white-space:nowrap}
+.leaflet-tooltip.pl::before{display:none}
+.fare{display:inline-block;margin-left:4px;padding:1px 6px;border-radius:99px;font-weight:600;font-size:11px;text-shadow:none;background:#fff;border:1px solid #ccc;color:#555}
+.fare.ok{background:#1d7a4f;border-color:#1d7a4f;color:#fff}
+.fare.part{background:#fff4dc;border-color:#e0b85a;color:#8a5a00}
+.endlbl{font-weight:700;color:#5a22b0}
+.leaflet-tooltip.rl{background:rgba(255,255,255,.88);border:0;border-radius:4px;box-shadow:none;padding:1px 5px;font:600 12px Inter,sans-serif}
+.leaflet-tooltip.rl::before{display:none}
+.leaflet-popup-content{font:13px/1.5 Inter,sans-serif;margin:12px 14px}
+.leaflet-popup-content b{font-weight:600}
+.leaflet-popup-content .acts{display:flex;gap:6px;margin-top:8px}
+.leaflet-popup-content .btn{background:#fff;color:#222;border-color:#ddd}
+.leaflet-popup-content .btn.primary{background:#7b3fd1;color:#fff;border-color:#7b3fd1}
+.legend{background:rgba(255,255,255,.95);border-radius:8px;padding:7px 10px;font:12px Inter,sans-serif;color:#222;box-shadow:0 1px 4px rgba(0,0,0,.2);line-height:1.8}
+.legend i{display:inline-block;width:26px;height:0;border-top:4px solid;vertical-align:middle;margin-right:6px}
+#dlg{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;z-index:5000}
+#dlg .box{background:var(--panel);color:var(--ink);width:min(860px,94vw);max-height:92vh;border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:10px}
+#dlg textarea{width:100%;height:50vh;font:12px/1.5 ui-monospace,Menlo,monospace;border:1px solid var(--line);border-radius:8px;padding:10px;background:var(--bg);color:var(--ink)}
+#dlg .err{color:#c0392b;font-size:12.5px;min-height:16px}
+code{font-size:11.5px;background:var(--bg);padding:1px 4px;border-radius:4px}
+@media (max-width:860px){
+  .app{grid-template-columns:1fr;grid-template-rows:62vh auto;height:auto}
+  aside{border-left:0;border-top:1px solid var(--line)}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <div id="map" aria-label="Map of Luzon expressways colored by RFID network"></div>
+  <aside>
+    <h1>Luzon expressways: RFID &amp; tolls</h1>
+    <p class="sub">Choose an entry plaza. Each exit on the map then shows its toll for your vehicle class. Pan to your exit and tap it for the full breakdown.</p>
+
+    <section>
+      <h2>Trip</h2>
+      <div class="row"><span class="small">Class</span>
+        <div class="seg" id="cls"><button data-c="1" class="on" title="Cars, jeepneys, pick-ups, motorcycles 400cc+">1 · Car</button><button data-c="2" title="Buses, light trucks">2 · Bus/truck</button><button data-c="3" title="Heavy trucks">3 · Heavy truck</button></div></div>
+      <div class="field"><label for="fFrom">Entry</label><input id="fFrom" placeholder="e.g. Balintawak" autocomplete="off"><button class="clr" data-for="fFrom" aria-label="Clear entry">×</button><div class="sugg"></div></div>
+      <div class="field"><label for="fTo">Exit</label><input id="fTo" placeholder="Tap on map or type" autocomplete="off"><button class="clr" data-for="fTo" aria-label="Clear exit">×</button><div class="sugg"></div></div>
+      <div class="row"><button class="btn" id="swap">⇅ Swap</button><button class="btn" id="copy">Copy link</button></div>
+      <div id="result"></div>
+      <div id="allx"></div>
+    </section>
+
+    <section>
+      <h2>Fares</h2>
+      <p class="small" id="fareStatus"></p>
+      <div class="row">
+        <button class="btn" id="editF">Edit table</button>
+        <label class="btn" style="display:inline-flex;align-items:center">Import CSV<input type="file" id="impF" accept=".csv,text/csv" hidden></label>
+        <button class="btn" id="expF">Download fares.csv</button>
+        <button class="btn" id="rstF">Reset</button>
+      </div>
+      <p class="small">Fares are stored per toll system, by entry and exit. Where a trip passes from one system into another, the handover point is called “<i>Other system</i> junction”. When a fare is missing, type it into the breakdown and it’s saved in this browser. To publish your fares, download <code>fares.csv</code> and commit it next to <code>index.html</code>.</p>
+    </section>
+
+    <section>
+      <h2>Networks</h2>
+      <div id="nets"></div>
+    </section>
+
+    <section class="opts">
+      <h2>Map</h2>
+      <label><input type="checkbox" id="optLabels" checked> Plaza names and tolls</label>
+      <label><input type="checkbox" id="optOther" checked> Roads not in the source article</label>
+    </section>
+
+    <p class="note">Which RFID each road reads, and the road lengths: Expressway.PH, “Autosweep vs Easytrip 2026”. Built-in fares: that article’s TRB-matrix examples (class 1, 1 Feb 2026). Expressway lines and plazas: OpenStreetMap. Base map: OpenStreetMap / CARTO. Distances are measured on the mapped roads and are approximate. The route is the shortest path, so it may use Skyway where you’d take SLEX at-grade. Check tolls at the point of travel.</p>
+  </aside>
+</div>
+
+<div id="dlg" role="dialog" aria-modal="true" aria-labelledby="dlgT"><div class="box">
+  <div style="display:flex;justify-content:space-between;align-items:center"><b id="dlgT" style="font-size:15px">Fare table (CSV)</b><button class="btn sm" id="dlgX">Close</button></div>
+  <div class="small">Columns: <code>system,from,to,class1,class2,class3,note</code>. A fare applies both ways. Use <code>*</code> for “any” — e.g. <code>NAIAX,*,*,…</code> for one flat toll on a road. Plaza names are the ones on the map without the “(road)” suffix. Systems: <span id="sysList"></span>.</div>
+  <textarea id="csvBox" spellcheck="false" aria-label="Fare table CSV"></textarea>
+  <div class="err" id="csvErr"></div>
+  <div class="row" style="justify-content:flex-end;margin:0"><button class="btn" id="dlgC">Cancel</button><button class="btn primary" id="dlgS">Save</button></div>
+</div></div>
+
+<script type="text/csv" id="fares-default">
+/*FARES*/
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+const DATA = /*DATA*/;
+</script>
+<script>
+(function(){
+const COLORS={Easytrip:'#2a72c9',Autosweep:'#d9532a','Toll-free':'#6f6e68',Other:'#a8a59b'};
+const NETS=[{key:'Easytrip',cls:'easy',tot:'249.72 km · 6 roads'},{key:'Autosweep',cls:'auto',tot:'254.75 km · 7 roads'},{key:'Toll-free',cls:'free',tot:'30.7 km'}];
+const ORDER=['SCTEX','NLEX','CALAX','CAVITEX','NLEX Connector','Harbor Link','Subic–Tipo','TPLEX','SLEX','STAR Tollway','Skyway','Skyway Stage 3','NAIAX','MCX','CLLEX'];
+const DISPLAY=n=>n==='CAVITEX'?'CAVITEX + C5 Link':n;
+// Toll systems: roads that charge as one entry→exit trip. Edit if operators integrate or separate systems.
+const SYSTEM={'NLEX':'NLEX-SCTEX','SCTEX':'NLEX-SCTEX','Subic–Tipo':'Subic–Tipo','TPLEX':'TPLEX','SLEX':'SLEX','STAR Tollway':'STAR','Skyway':'Skyway','Skyway Stage 3':'Skyway Stage 3','CALAX':'CALAX','CAVITEX':'CAVITEX','NAIAX':'NAIAX','MCX':'MCX','NLEX Connector':'NLEX Connector','Harbor Link':'Harbor Link','CLLEX':'CLLEX'};
+const FREE=new Set(['CLLEX']);
+const SYSTEMS=[...new Set(Object.values(SYSTEM))];
+const LS_KEY='luzon-rfid-fares-v1';
+
+const {roads,graph}=DATA;
+const byName=Object.fromEntries(roads.map(r=>[r.n,r]));
+const exits=graph.exits.map((e,i)=>({...e,id:i,base:e.l?e.l.replace(/\s+\([^)]*\)$/,''):null}));
+const named=exits.filter(e=>e.l);
+const hidden=new Set();const opt={labels:true,other:true};
+let cls=1,fromE=null,toE=null,tree=null,route=null,cache=new Map();
+
+/* ---------- fares ---------- */
+let fares=[],fareSource='built-in',baseText='';
+function parseCSV(t){
+  const rows=[];let row=[],f='',q=false;
+  for(let i=0;i<t.length;i++){const c=t[i];
+    if(q){if(c==='"'){if(t[i+1]==='"'){f+='"';i++}else q=false}else f+=c}
+    else if(c==='"')q=true;else if(c===','){row.push(f);f=''}
+    else if(c==='\n'||c==='\r'){if(c==='\r'&&t[i+1]==='\n')i++;row.push(f);rows.push(row);row=[];f=''}else f+=c}
+  if(f||row.length){row.push(f);rows.push(row)}
+  return rows.filter(r=>r.some(x=>x.trim()!=='')&&!r[0].trim().startsWith('#'));
+}
+function toFares(text){
+  const rows=parseCSV(text.trim());if(!rows.length)return [];
+  const h=rows[0].map(x=>x.trim().toLowerCase());
+  ['system','from','to','class1'].forEach(n=>{if(!h.includes(n))throw new Error('Missing column: '+n)});
+  return rows.slice(1).map((r,k)=>{const g=n=>h.indexOf(n)<0?'':(r[h.indexOf(n)]||'').trim();
+    const sys=g('system');if(!SYSTEMS.includes(sys))throw new Error(`Line ${k+2}: unknown system “${sys}”. Use one of: ${SYSTEMS.join(', ')}`);
+    if(!g('from')||!g('to'))throw new Error(`Line ${k+2}: from and to are required (use * for any)`);
+    const num=v=>{if(v==='')return null;const x=+v.replace(/[₱,\s]/g,'');if(isNaN(x)||x<0)throw new Error(`Line ${k+2}: “${v}” is not a valid amount`);return x};
+    return {system:sys,from:g('from'),to:g('to'),c:[null,num(g('class1')),num(g('class2')),num(g('class3'))],note:g('note')}});
+}
+function toCSV(){
+  const esc=v=>v==null?'':/[",\n]/.test(String(v))?'"'+String(v).replace(/"/g,'""')+'"':String(v);
+  return 'system,from,to,class1,class2,class3,note\n'+fares.map(f=>[f.system,f.from,f.to,f.c[1],f.c[2],f.c[3],f.note].map(esc).join(',')).join('\n')+'\n';
+}
+async function loadFares(){
+  baseText=document.getElementById('fares-default').textContent;
+  if(location.protocol.startsWith('http')){try{const r=await fetch('fares.csv',{cache:'no-store'});if(r.ok){const t=await r.text();toFares(t);baseText=t;fareSource='fares.csv'}}catch(_){}}
+  let local=null;try{local=localStorage.getItem(LS_KEY)}catch(_){}
+  try{fares=toFares(local||baseText);if(local)fareSource='edited in this browser'}catch(e){fares=toFares(baseText)}
+}
+function saveLocal(){try{localStorage.setItem(LS_KEY,toCSV())}catch(_){}fareSource='edited in this browser'}
+function fareStatus(){const miss=fares.filter(f=>f.c[cls]==null).length;
+  document.getElementById('fareStatus').innerHTML=`<b style="color:var(--ink)">${fares.length} fare rows</b> · source: ${fareSource}${miss?` · ${miss} have no class ${cls} amount`:''}`}
+const eq=(a,b)=>a.toLowerCase()===b.toLowerCase();
+function lookup(sys,a,b){
+  if(FREE.has(sys))return {v:0,free:true};
+  const ok=f=>f.system===sys&&f.c[cls]!=null;
+  const r=fares.find(f=>ok(f)&&((eq(f.from,a)&&eq(f.to,b))||(eq(f.from,b)&&eq(f.to,a))))
+       ||fares.find(f=>ok(f)&&((f.to==='*'&&(eq(f.from,a)||eq(f.from,b)))||(f.from==='*'&&(eq(f.to,a)||eq(f.to,b)))))
+       ||fares.find(f=>ok(f)&&f.from==='*'&&f.to==='*');
+  return r?{v:r.c[cls],row:r}:null;
+}
+
+/* ---------- routing ---------- */
+const N=graph.nodes.length,G=graph.nodes.map(()=>[]);
+graph.edges.forEach((e,i)=>{G[e[0]].push([e[1],e[2],i]);G[e[1]].push([e[0],e[2],i])});
+const edgeCoords=(i,u)=>{const e=graph.edges[i];const c=[graph.nodes[e[0]],...e[4],graph.nodes[e[1]]];return u===e[0]?c:c.reverse()};
+function dijkstra(src){
+  const dist=new Float64Array(N).fill(Infinity),prev=new Int32Array(N).fill(-1),pe=new Int32Array(N).fill(-1),pq=[];
+  const push=(d,u)=>{pq.push([d,u]);let i=pq.length-1;while(i>0){const p=(i-1)>>1;if(pq[p][0]<=pq[i][0])break;[pq[p],pq[i]]=[pq[i],pq[p]];i=p}};
+  const pop=()=>{const t=pq[0],l=pq.pop();if(pq.length){pq[0]=l;let i=0;for(;;){let a=2*i+1,b=a+1,m=i;if(a<pq.length&&pq[a][0]<pq[m][0])m=a;if(b<pq.length&&pq[b][0]<pq[m][0])m=b;if(m===i)break;[pq[m],pq[i]]=[pq[i],pq[m]];i=m}}return t};
+  src.forEach(s=>{dist[s]=0;push(0,s)});
+  while(pq.length){const [d,u]=pop();if(d>dist[u])continue;for(const [v,L,ei] of G[u])if(d+L<dist[v]){dist[v]=d+L;prev[v]=u;pe[v]=ei;push(d+L,v)}}
+  return {dist,prev,pe};
+}
+function legsOf(steps,km,A,B){
+  const segs=[];
+  steps.forEach(([u,ei])=>{const e=graph.edges[ei],road=e[3],sys=SYSTEM[road],line={road,c:edgeCoords(ei,u)},last=segs[segs.length-1];
+    if(last&&last.sys===sys){last.km+=e[2];last.roads.add(road);last.lines.push(line)}else segs.push({sys,km:e[2],roads:new Set([road]),lines:[line]})});
+  // hops under 2 km between systems are treated as untolled connections (ramps at a plaza or interchange)
+  for(let i=segs.length-1;i>=0&&segs.length>1;i--){if(segs[i].km<2){const s=segs.splice(i,1)[0];const n=segs[i-1]||segs[i];n.lines.push(...s.lines)}}
+  const legs=[];segs.forEach(s=>{const m=legs[legs.length-1];if(m&&m.sys===s.sys){m.km+=s.km;s.roads.forEach(r=>m.roads.add(r));m.lines.push(...s.lines)}else legs.push(s)});
+  legs.forEach((s,i)=>{s.from=i===0?A.base:`${legs[i-1].sys} junction`;s.to=i===legs.length-1?B.base:`${legs[i+1].sys} junction`;
+    const f=lookup(s.sys,s.from,s.to);s.fare=f?f.v:null;s.free=!!(f&&f.free);s.row=f&&f.row;s.net=byName[[...s.roads][0]].net});
+  return {legs,km,total:legs.reduce((a,s)=>a+(s.fare||0),0),missing:legs.filter(s=>s.fare==null).length};
+}
+function tripTo(E){
+  if(!tree||!fromE||E===fromE)return null;
+  if(cache.has(E.id))return cache.get(E.id);
+  let best=-1,bd=Infinity;E.n.forEach(n=>{if(tree.dist[n]<bd){bd=tree.dist[n];best=n}});
+  let res=null;
+  if(best>=0&&isFinite(bd)){const steps=[];let x=best;while(tree.prev[x]>=0){steps.push([tree.prev[x],tree.pe[x]]);x=tree.prev[x]}steps.reverse();res=legsOf(steps,bd,fromE,E)}
+  cache.set(E.id,res);return res;
+}
+const peso=v=>'₱'+(Math.round(v*100)/100).toLocaleString('en-PH');
+const fareText=t=>t.missing===0?peso(t.total):t.total>0?peso(t.total)+' + ?':'₱?';
+const fareCls=t=>t.missing===0?'ok':t.total>0?'part':'';
+
+/* ---------- map ---------- */
+const map=L.map('map').fitBounds([[13.65,119.95],[16.35,121.55]]);
+const att='© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
+// Base maps that need no API key. OpenStreetMap is the default; the choice is remembered per browser.
+const bases={
+  'OpenStreetMap':L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:att}),
+  'Esri Streets':L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,attribution:'Tiles © Esri — Esri, HERE, Garmin, © OpenStreetMap contributors, and the GIS user community'}),
+  'OSM Humanitarian':L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png',{maxZoom:19,subdomains:'abc',attribution:att+', tiles by <a href="https://www.hotosm.org/">HOT</a> / OSM France'}),
+  'CARTO Voyager':L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',{maxZoom:19,subdomains:'abcd',attribution:att+' © <a href="https://carto.com/attributions">CARTO</a>'}),
+  'CARTO Light':L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{maxZoom:19,subdomains:'abcd',attribution:att+' © CARTO'}),
+  'CARTO Dark':L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{maxZoom:19,subdomains:'abcd',attribution:att+' © CARTO'})};
+const BASE_KEY='luzon-rfid-basemap';
+// OpenStreetMap's servers block pages without a web address (opened from disk), so use Esri there
+let baseName=location.protocol==='file:'?'Esri Streets':'OpenStreetMap';try{const b=localStorage.getItem(BASE_KEY);if(bases[b])baseName=b}catch(_){}
+bases[baseName].addTo(map);
+map.on('baselayerchange',e=>{try{localStorage.setItem(BASE_KEY,e.name)}catch(_){}});
+// if the current base map fails to load, switch to the next one
+const order=Object.keys(bases);
+Object.entries(bases).forEach(([name,layer])=>{let errs=0,oks=0;
+  layer.on('tileload',()=>oks++);
+  layer.on('tileerror',()=>{errs++;if(errs===8&&oks===0&&map.hasLayer(layer)){const next=bases[order[(order.indexOf(name)+1)%order.length]];map.removeLayer(layer);next.addTo(map)}})});
+L.control.layers(bases,null,{position:'topright'}).addTo(map);
+L.control.scale({imperial:false}).addTo(map);
+map.createPane('roads').style.zIndex=410;map.createPane('route').style.zIndex=420;map.createPane('plazas').style.zIndex=630;
+const legend=L.control({position:'bottomleft'});
+legend.onAdd=()=>{const d=L.DomUtil.create('div','legend');d.innerHTML=`<div><i style="border-color:${COLORS.Easytrip}"></i>Easytrip</div><div><i style="border-color:${COLORS.Autosweep};border-top-style:dashed"></i>Autosweep</div><div><i style="border-color:${COLORS['Toll-free']};border-top-style:dotted"></i>Toll-free</div><div id="lgFare" style="display:none;border-top:1px solid #ddd;margin-top:4px;padding-top:2px"><span class="fare ok">₱</span> known <span class="fare part">₱ + ?</span> partly <span class="fare">₱?</span> missing</div>`;return d};
+legend.addTo(map);
+const ll=c=>c.map(p=>[p[1],p[0]]);
+const ord=r=>r.net==='Other'?0:r.net==='Toll-free'?1:2;
+const roadLayers=roads.slice().sort((a,b)=>ord(a)-ord(b)).map(r=>{
+  const lines=r.lines.map(ll);
+  const casing=L.polyline(lines,{pane:'roads',color:'#fff',weight:8,opacity:.85,interactive:false});
+  const line=L.polyline(lines,{pane:'roads',color:COLORS[r.net],weight:4,dashArray:r.net==='Autosweep'?'9 6':r.net==='Toll-free'?'2 7':r.net==='Other'?'4 4':null,lineCap:r.net==='Autosweep'?'butt':'round'});
+  line.bindTooltip(`<b>${DISPLAY(r.n)}</b> · ${r.net==='Other'?'not in article':r.net}${r.km?' · '+r.km+' km':''}`,{sticky:true});
+  line.on('click',e=>L.popup().setLatLng(e.latlng).setContent(`<b>${DISPLAY(r.n)}</b><br><span style="color:${COLORS[r.net]};font-weight:600">${r.net==='Other'?'Not covered in the article':r.net}</span>${r.km?' · '+r.km+' km':''}${r.op?'<br><span style="color:#777">'+r.op+'</span>':''}${SYSTEM[r.n]?'<br><span style="color:#777">Toll system: '+SYSTEM[r.n]+'</span>':''}`).openOn(map));
+  return {r,casing,line};
+});
+const RL={'TPLEX':[15.85,120.63],'SCTEX':[14.97,120.40],'NLEX':[14.90,120.80],'CLLEX':[15.52,120.80],'SLEX':[14.28,121.10],'STAR Tollway':[13.95,121.16],'CALAX':[14.30,120.95],'CAVITEX':[14.47,120.93]};
+const roadLabels=Object.entries(RL).map(([n,p])=>({r:byName[n],t:L.tooltip({permanent:true,direction:'right',className:'rl',offset:[6,0]}).setLatLng(p).setContent(`<span style="color:${COLORS[byName[n].net]}">${n==='STAR Tollway'?'STAR':n}</span>`)}));
+const routeLayer=L.layerGroup().addTo(map);
+const plazaLayers=exits.map(e=>{const m=L.circleMarker([e.y,e.x],{pane:'plazas',radius:5,weight:2.5,color:COLORS[e.net],fillColor:'#fff',fillOpacity:1});m.on('click',()=>openPlaza(e));return {e,m}});
+function openPlaza(e){
+  const t=fromE&&e!==fromE?tripTo(e):null;
+  let html=`<b>${e.l||'Unnamed toll plaza'}</b><br>${DISPLAY(e.r)} · <span style="color:${COLORS[e.net]};font-weight:600">${e.net}</span>`;
+  if(t)html+=`<br>From ${fromE.l}: <span class="fare ${fareCls(t)}" style="margin:0">${fareText(t)}</span> · ${t.km.toFixed(0)} km`;
+  html+=e.l?`<div class="acts"><button class="btn sm" data-a="from">Entry here</button><button class="btn sm primary" data-a="to">${fromE&&e!==fromE?'Exit here · breakdown':'Exit here'}</button></div>`:'<div style="color:#777;margin-top:4px">No name in the map data, so it can’t be used as an entry or exit.</div>';
+  const p=L.popup({offset:[0,-4]}).setLatLng([e.y,e.x]).setContent(html).openOn(map);
+  p.getElement().querySelectorAll('[data-a]').forEach(b=>b.onclick=()=>{map.closePopup();b.dataset.a==='from'?setFrom(e):setTo(e,false)});
+}
+function refreshMap(){
+  const z=map.getZoom(),dim=!!route;
+  roadLayers.forEach(({r,casing,line})=>{const v=!hidden.has(r.net)&&(r.net!=='Other'||opt.other);
+    [casing,line].forEach(l=>{if(v&&!map.hasLayer(l))l.addTo(map);if(!v&&map.hasLayer(l))map.removeLayer(l)});
+    line.setStyle({weight:r.net==='Other'?2.5:z>=12?6:z>=10?5:4,opacity:dim?.5:1});casing.setStyle({weight:z>=12?10:z>=10?9:7,opacity:dim?.4:.85})});
+  roadLabels.forEach(({r,t})=>{const v=z<=10&&!hidden.has(r.net);if(v&&!map.hasLayer(t))t.addTo(map);if(!v&&map.hasLayer(t))map.removeLayer(t)});
+  plazaLayers.forEach(({e,m})=>{
+    const isEnd=e===fromE||e===toE,v=isEnd||(z>=9&&!hidden.has(e.net));
+    if(v&&!map.hasLayer(m))m.addTo(map);if(!v&&map.hasLayer(m))map.removeLayer(m);
+    m.setStyle(isEnd?{radius:8,fillColor:'#7b3fd1',color:'#fff',weight:3}:{radius:z>=12?6:5,fillColor:'#fff',color:COLORS[e.net],weight:2.5});
+    if(isEnd&&map.hasLayer(m))m.bringToFront();
+    let label=null;
+    if(isEnd)label=`<span class="endlbl">${e===fromE?'Entry: ':'Exit: '}${e.l}</span>${e===toE&&route?` <span class="fare ${fareCls(route)}">${fareText(route)}</span>`:''}`;
+    else if(v&&opt.labels&&e.l&&(z>=11||(fromE&&z>=10))){const t=fromE?tripTo(e):null;label=e.l+(t?` <span class="fare ${fareCls(t)}">${fareText(t)}</span>`:'')}
+    const tt=m.getTooltip();
+    if(label){if(!tt)m.bindTooltip(label,{permanent:true,direction:'right',offset:[7,0],className:'pl'});else tt.setContent(label);if(map.hasLayer(m))m.openTooltip()}
+    else if(tt)m.unbindTooltip();
+  });
+  requestAnimationFrame(declutter);
+}
+function declutter(){
+  const items=plazaLayers.filter(p=>map.hasLayer(p.m)&&p.m.getTooltip()&&p.m.getTooltip().getElement()).map(p=>({p,el:p.m.getTooltip().getElement()}));
+  const pri=x=>(x.p.e===fromE||x.p.e===toE)?0:1;
+  items.forEach(x=>x.el.style.visibility='visible');items.sort((a,b)=>pri(a)-pri(b));
+  const placed=[];
+  items.forEach(x=>{const r=x.el.getBoundingClientRect();if(pri(x)&&placed.some(q=>!(r.right<q.left||r.left>q.right||r.bottom<q.top||r.top>q.bottom)))x.el.style.visibility='hidden';else placed.push(r)});
+}
+map.on('zoomend',refreshMap);map.on('moveend',()=>requestAnimationFrame(declutter));
+
+/* ---------- trip UI ---------- */
+function recompute(){
+  cache=new Map();tree=fromE?dijkstra(fromE.n):null;
+  route=fromE&&toE&&fromE!==toE?tripTo(toE):null;
+  routeLayer.clearLayers();
+  if(route)route.legs.forEach(s=>s.lines.forEach(l=>{L.polyline(ll(l.c),{pane:'route',color:'#7b3fd1',weight:13,opacity:.35,lineCap:'round',interactive:false}).addTo(routeLayer);L.polyline(ll(l.c),{pane:'route',color:COLORS[byName[l.road].net],weight:5,lineCap:'round',interactive:false}).addTo(routeLayer)}));
+  document.getElementById('lgFare').style.display=fromE?'block':'none';
+  renderResult();renderAll();refreshMap();writeHash();fareStatus();
+}
+function renderResult(){
+  const el=document.getElementById('result');
+  if(!fromE){el.innerHTML='<p class="hint">Pick an entry. Every exit then shows its toll: on the map from zoom 10, and in a list here.</p>';return}
+  if(!toE){el.innerHTML='<p class="hint">Now pan the map to your exit and tap it, or pick it from the list below.</p>';return}
+  if(fromE===toE){el.innerHTML='<p class="hint">Entry and exit are the same plaza.</p>';return}
+  if(!route){el.innerHTML='<p class="hint">No connected expressway route between these plazas in the map data.</p>';return}
+  const nets=[...new Set(route.legs.map(s=>s.net).filter(n=>n==='Easytrip'||n==='Autosweep'))];
+  const v=nets.length===0?['free','No RFID needed (toll-free).']:nets.length===1?[nets[0]==='Easytrip'?'easy':'auto',`${nets[0]} only. One sticker covers this trip.`]:['both','Crosses both networks. Use a One RFID–enrolled sticker, or load both Easytrip and Autosweep.'];
+  el.innerHTML=`<div class="result"><div class="small">${fromE.l} → ${toE.l} · class ${cls} · ${route.km.toFixed(0)} km</div>
+   <div class="top" style="margin-top:2px"><span class="big">${fareText(route)}</span><span class="small">${route.missing?route.missing+' fare'+(route.missing>1?'s':'')+' missing':'total toll, one way'}</span></div>
+   <div class="verdict ${v[0]}">${v[1]}</div>
+   <ul class="legs">${route.legs.map((s,i)=>`<li><div class="l1"><span><span class="dot" style="background:${COLORS[s.net]}"></span><b>${s.sys}</b> <span class="small">· ${s.net} · ${s.km.toFixed(1)} km</span></span><span class="amt ${s.fare==null?'miss':''}">${s.fare==null?'₱?':s.free?'free':peso(s.fare)}</span></div>
+     <div class="l2">${s.from} → ${s.to}${s.row&&(s.row.from==='*'||s.row.to==='*')?' · flat rate':''}${s.row&&s.row.note?' · '+s.row.note:''}</div>
+     ${s.fare==null?`<div class="addfare"><input type="number" min="0" step="0.01" inputmode="decimal" placeholder="Class ${cls} ₱" data-i="${i}" aria-label="Class ${cls} fare for ${s.sys}, ${s.from} to ${s.to}"><button class="btn sm" data-save="${i}">Save fare</button></div>`:''}</li>`).join('')}</ul></div>`;
+  el.querySelectorAll('[data-save]').forEach(b=>b.onclick=()=>{
+    const i=+b.dataset.save,inp=el.querySelector(`input[data-i="${i}"]`),val=parseFloat(inp.value);
+    if(isNaN(val)||val<0){inp.style.outline='2px solid #c0392b';inp.focus();return}
+    const s=route.legs[i];let row=fares.find(f=>f.system===s.sys&&((eq(f.from,s.from)&&eq(f.to,s.to))||(eq(f.from,s.to)&&eq(f.to,s.from))));
+    if(!row){row={system:s.sys,from:s.from,to:s.to,c:[null,null,null,null],note:'added in browser'};fares.push(row)}
+    row.c[cls]=val;saveLocal();recompute()});
+  el.querySelectorAll('.addfare input').forEach(inp=>inp.addEventListener('keydown',e=>{if(e.key==='Enter')el.querySelector(`[data-save="${inp.dataset.i}"]`).click()}));
+}
+function renderAll(){
+  const el=document.getElementById('allx');
+  if(!fromE){el.innerHTML='';return}
+  const list=named.filter(e=>e!==fromE).map(e=>({e,t:tripTo(e)})).filter(x=>x.t).sort((a,b)=>a.t.km-b.t.km);
+  el.innerHTML=`<p class="small" style="margin:6px 0">All exits from ${fromE.l} · toll known for ${list.filter(x=>x.t.missing===0).length} of ${list.length}</p><ul class="exlist">${list.map(x=>`<li data-id="${x.e.id}" ${x.e===toE?'style="background:var(--route-bg)"':''}><span>${x.e.l}</span><span class="km">${x.t.km.toFixed(0)} km</span><span class="p ${x.t.missing?'miss':''}">${fareText(x.t)}</span></li>`).join('')}</ul>`;
+  el.querySelectorAll('li').forEach(li=>li.onclick=()=>setTo(exits[+li.dataset.id],true));
+}
+function autocomplete(input,items,onPick){
+  const box=input.parentNode.querySelector('.sugg');let act=-1,cur=[];
+  const norm=s=>s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+  const show=()=>{const q=norm(input.value.trim());const all=items();cur=(q?all.filter(i=>norm(i.label).includes(q)).sort((a,b)=>norm(a.label).indexOf(q)-norm(b.label).indexOf(q)):all).slice(0,60);act=-1;
+    box.innerHTML=cur.map((i,k)=>`<div data-k="${k}"><span>${i.label}</span><small>${i.meta}</small></div>`).join('');box.style.display=cur.length?'block':'none'};
+  input.addEventListener('focus',()=>{input.select();show()});input.addEventListener('input',show);
+  input.addEventListener('blur',()=>setTimeout(()=>box.style.display='none',150));
+  input.addEventListener('keydown',e=>{const n=box.children.length;if(!n)return;
+    if(e.key==='ArrowDown'){act=(act+1)%n;e.preventDefault()}else if(e.key==='ArrowUp'){act=(act-1+n)%n;e.preventDefault()}
+    else if(e.key==='Enter'){const i=cur[act<0?0:act];if(i){onPick(i.v);box.style.display='none';input.blur()}e.preventDefault();return}else return;
+    [...box.children].forEach((c,k)=>c.classList.toggle('act',k===act))});
+  box.addEventListener('mousedown',e=>{const d=e.target.closest('[data-k]');if(d){onPick(cur[+d.dataset.k].v);box.style.display='none'}});
+}
+const fIn=document.getElementById('fFrom'),tIn=document.getElementById('fTo');
+const exitItems=()=>named.slice().sort((a,b)=>a.l.localeCompare(b.l)).map(e=>{const t=fromE&&e!==fromE?tripTo(e):null;return {label:e.l,meta:t?`${fareText(t)} · ${t.km.toFixed(0)} km`:`${DISPLAY(e.r)} · ${e.net}`,v:e}});
+function setFrom(e){fromE=e;fIn.value=e?e.l:'';if(e&&toE===e){toE=null;tIn.value=''}recompute();if(e){if(route)fitRoute();else map.flyTo([e.y,e.x],Math.max(map.getZoom(),10),{duration:.6})}}
+function setTo(e,fly=true){toE=e;tIn.value=e?e.l:'';recompute();if(!fly||!e)return;if(route)fitRoute();else map.flyTo([e.y,e.x],Math.max(map.getZoom(),11),{duration:.6})}
+function fitRoute(){if(!route)return;const pts=[];route.legs.forEach(s=>s.lines.forEach(l=>l.c.forEach(p=>pts.push([p[1],p[0]]))));map.flyToBounds(pts,{padding:[50,50],duration:.7})}
+autocomplete(fIn,exitItems,setFrom);autocomplete(tIn,exitItems,e=>setTo(e,true));
+document.querySelectorAll('.clr').forEach(b=>b.onclick=()=>b.dataset.for==='fFrom'?setFrom(null):setTo(null));
+document.getElementById('swap').onclick=()=>{[fromE,toE]=[toE,fromE];fIn.value=fromE?fromE.l:'';tIn.value=toE?toE.l:'';recompute()};
+document.getElementById('copy').onclick=async ev=>{writeHash();try{await navigator.clipboard.writeText(location.href);ev.target.textContent='Copied ✓'}catch(_){ev.target.textContent='Copy from address bar'}setTimeout(()=>ev.target.textContent='Copy link',1600)};
+document.querySelectorAll('#cls button').forEach(b=>b.onclick=()=>{cls=+b.dataset.c;document.querySelectorAll('#cls button').forEach(x=>x.classList.toggle('on',x===b));recompute()});
+
+const netsEl=document.getElementById('nets');
+NETS.forEach(n=>{const box=document.createElement('div');box.className='net '+n.cls;
+  box.innerHTML=`<div class="nethead" role="button" tabindex="0"><svg class="sw" viewBox="0 0 28 10"><line x1="2" y1="5" x2="26" y2="5" stroke="${COLORS[n.key]}" stroke-width="${n.key==='Toll-free'?3:5}" ${n.key==='Autosweep'?'stroke-dasharray="7 4"':n.key==='Toll-free'?'stroke-dasharray="1.5 4"':''}/></svg><b>${n.key}</b><span class="tot">${n.tot}</span><span class="eye">hide</span></div><ul class="rows"></ul>`;
+  const ul=box.querySelector('ul');
+  ORDER.map(k=>byName[k]).filter(r=>r&&r.net===n.key).sort((a,b)=>(+b.km||0)-(+a.km||0)).forEach(r=>{const li=document.createElement('li');li.innerHTML=`<span>${DISPLAY(r.n)}</span><span>${r.km?r.km+' km':'not in article'}</span>`;
+    li.onclick=()=>{const pts=[];r.lines.forEach(l=>l.forEach(p=>pts.push([p[1],p[0]])));map.flyToBounds(pts,{padding:[40,40],duration:.7});if(innerWidth<=860)document.getElementById('map').scrollIntoView({behavior:'smooth'})};ul.appendChild(li)});
+  const tog=()=>{hidden.has(n.key)?hidden.delete(n.key):hidden.add(n.key);box.classList.toggle('off',hidden.has(n.key));box.querySelector('.eye').textContent=hidden.has(n.key)?'show':'hide';refreshMap()};
+  const head=box.querySelector('.nethead');head.onclick=tog;head.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();tog()}};netsEl.appendChild(box)});
+document.getElementById('optLabels').onchange=e=>{opt.labels=e.target.checked;refreshMap()};
+document.getElementById('optOther').onchange=e=>{opt.other=e.target.checked;refreshMap()};
+
+const dlg=document.getElementById('dlg'),box=document.getElementById('csvBox'),err=document.getElementById('csvErr');
+document.getElementById('sysList').textContent=SYSTEMS.join(', ');
+document.getElementById('editF').onclick=()=>{box.value=toCSV();err.textContent='';dlg.style.display='flex';box.focus()};
+const closeDlg=()=>dlg.style.display='none';
+document.getElementById('dlgX').onclick=closeDlg;document.getElementById('dlgC').onclick=closeDlg;
+dlg.addEventListener('keydown',e=>{if(e.key==='Escape')closeDlg()});
+document.getElementById('dlgS').onclick=()=>{try{fares=toFares(box.value);saveLocal();closeDlg();recompute()}catch(e){err.textContent=e.message}};
+document.getElementById('impF').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{fares=toFares(await f.text());saveLocal();recompute()}catch(x){box.value=await f.text();err.textContent='Could not import: '+x.message;dlg.style.display='flex'}e.target.value=''};
+document.getElementById('expF').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([toCSV()],{type:'text/csv'}));a.download='fares.csv';document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500)};
+document.getElementById('rstF').onclick=()=>{if(!confirm('Discard fares edited in this browser and go back to the published table?'))return;try{localStorage.removeItem(LS_KEY)}catch(_){}fares=toFares(baseText);fareSource=location.protocol.startsWith('http')&&baseText!==document.getElementById('fares-default').textContent?'fares.csv':'built-in';recompute()};
+
+function writeHash(){const p=new URLSearchParams();if(fromE)p.set('from',fromE.l);if(toE)p.set('to',toE.l);if(cls!==1)p.set('class',cls);const h=p.toString();history.replaceState(null,'',h?'#'+h:location.pathname+location.search)}
+function readHash(){const p=new URLSearchParams(location.hash.slice(1));const c=+p.get('class');
+  if(c>=1&&c<=3){cls=c;document.querySelectorAll('#cls button').forEach(x=>x.classList.toggle('on',+x.dataset.c===c))}
+  fromE=named.find(e=>e.l===p.get('from'))||null;toE=named.find(e=>e.l===p.get('to'))||null;fIn.value=fromE?fromE.l:'';tIn.value=toE?toE.l:'';
+  recompute();if(route)setTimeout(fitRoute,100);else if(fromE)map.setView([fromE.y,fromE.x],10)}
+loadFares().then(readHash);
+})();
+</script>
+</body>
+</html>
