@@ -1,0 +1,16 @@
+# system: TPLEX
+# class: 3
+# effective:
+# note: TRB page shows no date; La Paz–Rosario ₱311 matches Expressway.PH (Feb 2026)
+# source: Toll Regulatory Board, trb.gov.ph/index.php/toll-rates/tplex-toll-rate (undated; Class 3 La Paz–Moncada 396 as published)
+Exit \ Entry,La Paz,Victoria,Gerona,Paniqui,Moncada,Carmen,Urdaneta,Binalonan,Pozorrubio,Sison
+Victoria,91
+Gerona,175,84
+Paniqui,237,146,62
+Moncada,396,206,122,60
+Carmen,492,401,317,255,195
+Urdaneta,648,557,473,411,351,156
+Binalonan,704,614,530,468,408,213,57
+Pozorrubio,810,719,635,573,514,318,162,106
+Sison,871,781,697,635,575,380,224,167,62
+Rosario,933,843,759,697,637,442,286,229,124,62

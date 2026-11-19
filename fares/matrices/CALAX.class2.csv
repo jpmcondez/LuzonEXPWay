@@ -1,0 +1,10 @@
+# system: CALAX
+# class: 2
+# effective: 2024-02-08
+# source: Toll Regulatory Board, trb.gov.ph/index.php/toll-rates/calax. OUTDATED: Subsection 3 (Governor's Drive) tolled since Aug 2026 and not included; replace with the current TRB matrix.
+Exit \ Entry,Silang Interchange,Silang East,Santa Rosa-Tagaytay,Laguna Boulevard,Technopark
+Silang East,35
+Santa Rosa-Tagaytay,90,55
+Laguna Boulevard,102,67,29
+Technopark,132,97,59,30
+Greenfield,163,128,89,60

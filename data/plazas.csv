@@ -1,0 +1,88 @@
+# Toll plaza registry: links TRB fare-matrix names to plazas on the map.
+# system,name,aliases,road,lat,lon,note
+# - name: the plaza name exactly as in the TRB matrix (used in fares).
+# - aliases: other names for it, separated by ";" (OpenStreetMap labels, and "<Other system> junction" handover points).
+# - road/lat/lon: only for plazas that are missing or unnamed in OpenStreetMap; the build snaps them onto that road.
+system,name,aliases,road,lat,lon,note
+NLEX-SCTEX,Balintawak,Skyway Stage 3 junction;NLEX Connector junction,,,,
+NLEX-SCTEX,Mindanao Ave.,Mindanao Avenue,,,,
+NLEX-SCTEX,Karuhatan,,,,,
+NLEX-SCTEX,Valenzuela,Lawang Bato,,,,"Lawang Bato assumed to be the Valenzuela plaza (open system, same fare either way)"
+NLEX-SCTEX,Meycauayan,,,,,
+NLEX-SCTEX,Marilao,,,,,
+NLEX-SCTEX,Ciudad de Victoria,Philippine Arena,,,,
+NLEX-SCTEX,Bocaue,,,,,
+NLEX-SCTEX,Tambubong,,,,,
+NLEX-SCTEX,Balagtas,,,,,
+NLEX-SCTEX,Sta. Rita,Santa Rita,,,,
+NLEX-SCTEX,Pulilan,,,,,
+NLEX-SCTEX,San Simon,,,,,
+NLEX-SCTEX,San Fernando,,,,,
+NLEX-SCTEX,Mexico,,,,,
+NLEX-SCTEX,Angeles,,,,,
+NLEX-SCTEX,Dau,,,,,
+NLEX-SCTEX,Tipo/Subic,Tipo;Subic–Tipo junction,,,,
+NLEX-SCTEX,Dinalupihan,,,,,
+NLEX-SCTEX,Floridablanca,,,,,
+NLEX-SCTEX,Porac,,,,,
+NLEX-SCTEX,Clark South,,,,,
+NLEX-SCTEX,Mabalacat (Mabiga),Mabiga,,,,
+NLEX-SCTEX,Clark North,,SCTEX,15.215,120.566,approximate position
+NLEX-SCTEX,Dolores,,,,,
+NLEX-SCTEX,Bamban/New Clark City,,SCTEX,15.290,120.585,approximate position
+NLEX-SCTEX,Concepcion,,SCTEX,15.355,120.620,approximate position
+NLEX-SCTEX,Hacienda Luisita,,,,,
+NLEX-SCTEX,Tabang,,,,,
+NLEX-SCTEX,Sta. Ines,Santa Ines,,,,
+NLEX-SCTEX,Tarlac,Tarlac City;TPLEX junction;CLLEX junction,,,,"SCTEX end at the TPLEX La Paz interchange"
+TPLEX,La Paz,NLEX-SCTEX junction;CLLEX junction,TPLEX,15.470,120.676,approximate position (TPLEX start at the SCTEX interchange)
+TPLEX,Victoria,,TPLEX,15.560,120.650,approximate position
+TPLEX,Gerona,,TPLEX,15.616,120.634,unnamed OSM toll plaza
+TPLEX,Paniqui,,TPLEX,15.668,120.625,approximate position
+TPLEX,Moncada,,TPLEX,15.718,120.616,unnamed OSM toll plaza
+TPLEX,Carmen,,TPLEX,15.874,120.620,unnamed OSM toll plaza
+TPLEX,Urdaneta,,TPLEX,15.975,120.590,approximate position
+TPLEX,Binalonan,,TPLEX,16.050,120.565,unnamed OSM toll plaza
+TPLEX,Pozorrubio,,TPLEX,16.110,120.545,approximate position
+TPLEX,Sison,,,,,
+TPLEX,Rosario,,,,,
+Skyway Stage 3,Buendia,Skyway-SLEX-MCX junction,,,,
+Skyway Stage 3,Quirino,Quirino Avenue,,,,
+Skyway Stage 3,Plaza Azul/Nagtahan,Plaza Azul;Nagtahan,,,,
+Skyway Stage 3,Plaza Dilao,,,,,
+Skyway Stage 3,E. Rodriguez,,,,,
+Skyway Stage 3,Quezon Avenue,,,,,
+Skyway Stage 3,A. Bonifacio-Balintawak,,,,,
+Skyway Stage 3,NLEX,NLEX-SCTEX junction;Balintawak,,,,"NLEX end of Stage 3, next to NLEX Balintawak"
+Skyway-SLEX-MCX,Magallanes,MAG,,,,
+Skyway-SLEX-MCX,C-5,C5,,,,
+Skyway-SLEX-MCX,Bicutan,BIC,,,,
+Skyway-SLEX-MCX,Sucat,SUC,,,,
+Skyway-SLEX-MCX,Alabang,ALA,,,,
+Skyway-SLEX-MCX,Filinvest,FIL,,,,
+Skyway-SLEX-MCX,MCX,,,,,
+Skyway-SLEX-MCX,Susana Heights,SUS HTS,,,,
+Skyway-SLEX-MCX,San Pedro,SNP,,,,
+Skyway-SLEX-MCX,Southwoods,SWOODS,,,,
+Skyway-SLEX-MCX,Carmona,CAR,,,,
+Skyway-SLEX-MCX,Mamplasan,MAM;CALAX junction,,,,
+Skyway-SLEX-MCX,Santa Rosa,STR,,,,
+Skyway-SLEX-MCX,ABI,,,,,"TRB abbreviation; not yet matched to a map plaza"
+Skyway-SLEX-MCX,Cabuyao,CAB,,,,"not yet matched to a map plaza"
+Skyway-SLEX-MCX,Silangan,SIL,,,,
+Skyway-SLEX-MCX,Calamba,CAL,,,,
+Skyway-SLEX-MCX,Santo Tomas,STOMAS;STAR junction,,,,
+STAR,Santo Tomas,Skyway-SLEX-MCX junction,,,,
+STAR,Tanauan,Tanauan City,,,,
+STAR,Malvar,,,,,
+STAR,Lipa,Lipa City,,,,
+STAR,Santo Toribio,,,,,
+STAR,Ibaan,,,,,
+STAR,Batangas City,,,,,
+CALAX,Silang Interchange,Silang,,,,
+CALAX,Silang East,,,,,
+CALAX,Santa Rosa-Tagaytay,Santa Rosa City,,,,"assumed to be the OSM plaza named Santa Rosa City"
+CALAX,Laguna Boulevard,,,,,
+CALAX,Technopark,Laguna Technopark,,,,
+CALAX,Greenfield,Skyway-SLEX-MCX junction,,,,"assumed: CALAX meets SLEX at Mamplasan beside Greenfield"
+Skyway-SLEX-MCX,Buendia,Skyway Stage 3 junction,,,,

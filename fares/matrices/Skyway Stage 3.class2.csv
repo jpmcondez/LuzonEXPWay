@@ -1,0 +1,12 @@
+# system: Skyway Stage 3
+# class: 2
+# effective: 2021-07-01
+# source: Toll Regulatory Board, trb.gov.ph/index.php/toll-rates/metro-manila-skyway-stage-3 (rates read as two-way; Buendia–Balintawak ₱264 matches Expressway.PH 2026)
+Exit \ Entry,Buendia,Quirino,Plaza Azul/Nagtahan,Plaza Dilao,E. Rodriguez,Quezon Avenue,A. Bonifacio-Balintawak
+Quirino,210
+Plaza Azul/Nagtahan,210
+Plaza Dilao,210
+E. Rodriguez,--
+Quezon Avenue,528,--,528,--,258
+A. Bonifacio-Balintawak,528,--,528,--,258,258
+NLEX,528,--,528,--,258,258

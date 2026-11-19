@@ -132,12 +132,12 @@ code{font-size:11.5px;background:var(--bg);padding:1px 4px;border-radius:4px}
       <h2>Fares</h2>
       <p class="small" id="fareStatus"></p>
       <div class="row">
-        <button class="btn" id="editF">Edit table</button>
+        <button class="btn primary" id="pasteM">Paste TRB matrix</button><button class="btn" id="editF">Edit table</button>
         <label class="btn" style="display:inline-flex;align-items:center">Import CSV<input type="file" id="impF" accept=".csv,text/csv" hidden></label>
         <button class="btn" id="expF">Download fares.csv</button>
         <button class="btn" id="rstF">Reset</button>
       </div>
-      <p class="small">Fares are stored per toll system, by entry and exit. Where a trip passes from one system into another, the handover point is called “<i>Other system</i> junction”. When a fare is missing, type it into the breakdown and it’s saved in this browser. To publish your fares, download <code>fares.csv</code> and commit it next to <code>index.html</code>.</p>
+      <p class="small">When the TRB publishes new rates: open its toll-rate page, copy one class's table, choose <b>Paste TRB matrix</b>, paste, and save. Then download <code>fares.csv</code> and commit it. Fares are stored per toll system, by entry and exit. Where a trip passes from one system into another, the handover point is called “<i>Other system</i> junction”. When a fare is missing, type it into the breakdown and it’s saved in this browser. To publish your fares, download <code>fares.csv</code> and commit it next to <code>index.html</code>.</p>
     </section>
 
     <section>
@@ -163,6 +163,21 @@ code{font-size:11.5px;background:var(--bg);padding:1px 4px;border-radius:4px}
   <div class="row" style="justify-content:flex-end;margin:0"><button class="btn" id="dlgC">Cancel</button><button class="btn primary" id="dlgS">Save</button></div>
 </div></div>
 
+<div id="mdlg" class="dlgwrap" role="dialog" aria-modal="true" aria-labelledby="mT" style="position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;z-index:5000"><div class="box" style="background:var(--panel);color:var(--ink);width:min(900px,95vw);max-height:94vh;overflow:auto;border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:10px">
+  <div style="display:flex;justify-content:space-between;align-items:center"><b id="mT" style="font-size:15px">Paste a toll matrix</b><button class="btn sm" id="mX">Close</button></div>
+  <div class="small">Copy one class's table from the TRB page (trb.gov.ph → Toll Rates), or from a spreadsheet, and paste it below. The first row should list entry plazas and the first column exit plazas. Tabs or commas both work, and blank or “–” cells are skipped. Fares are saved for both directions. Names are matched to map plazas through the plaza list; any unmatched names are listed before saving.</div>
+  <div class="row" style="margin:0">
+    <label class="small">System <select id="mSys"></select></label>
+    <label class="small">Class <select id="mCls"><option>1</option><option>2</option><option>3</option></select></label>
+    <label class="small">Effective <input id="mEff" type="month" style="padding:4px"></label>
+    <label class="small" style="flex:1;min-width:200px">Source <input id="mSrc" placeholder="e.g. TRB toll rate matrix, trb.gov.ph" style="width:100%;padding:4px"></label>
+  </div>
+  <label class="small"><input type="checkbox" id="mRepl" checked> Replace all existing fares for this system and class</label>
+  <label class="small"><input type="checkbox" id="mDl" checked> Also download it as <code>fares/matrices/&lt;system&gt;.class&lt;N&gt;.csv</code> to commit to the repo</label>
+  <textarea id="mBox" spellcheck="false" style="width:100%;height:38vh;font:12px/1.5 ui-monospace,Menlo,monospace;border:1px solid var(--line);border-radius:8px;padding:10px;background:var(--bg);color:var(--ink)" placeholder="Exit \ Entry	La Paz	Victoria	Gerona …&#10;Victoria	30&#10;Gerona	58	28&#10;…"></textarea>
+  <div id="mPrev" class="small"></div>
+  <div class="row" style="justify-content:flex-end;margin:0"><button class="btn" id="mChk">Check</button><button class="btn primary" id="mSave">Save fares</button></div>
+</div></div>
 <script type="text/csv" id="fares-default">
 /*FARES*/
 </script>
@@ -177,12 +192,16 @@ const NETS=[{key:'Easytrip',cls:'easy',tot:'249.72 km · 6 roads'},{key:'Autoswe
 const ORDER=['SCTEX','NLEX','CALAX','CAVITEX','NLEX Connector','Harbor Link','Subic–Tipo','TPLEX','SLEX','STAR Tollway','Skyway','Skyway Stage 3','NAIAX','MCX','CLLEX'];
 const DISPLAY=n=>n==='CAVITEX'?'CAVITEX + C5 Link':n;
 // Toll systems: roads that charge as one entry→exit trip. Edit if operators integrate or separate systems.
-const SYSTEM={'NLEX':'NLEX-SCTEX','SCTEX':'NLEX-SCTEX','Subic–Tipo':'Subic–Tipo','TPLEX':'TPLEX','SLEX':'SLEX','STAR Tollway':'STAR','Skyway':'Skyway','Skyway Stage 3':'Skyway Stage 3','CALAX':'CALAX','CAVITEX':'CAVITEX','NAIAX':'NAIAX','MCX':'MCX','NLEX Connector':'NLEX Connector','Harbor Link':'Harbor Link','CLLEX':'CLLEX'};
+const SYSTEM={'NLEX':'NLEX-SCTEX','SCTEX':'NLEX-SCTEX','Harbor Link':'NLEX-SCTEX','Subic–Tipo':'Subic–Tipo','TPLEX':'TPLEX','SLEX':'Skyway-SLEX-MCX','Skyway':'Skyway-SLEX-MCX','MCX':'Skyway-SLEX-MCX','STAR Tollway':'STAR','Skyway Stage 3':'Skyway Stage 3','CALAX':'CALAX','CAVITEX':'CAVITEX','NAIAX':'NAIAX','NLEX Connector':'NLEX Connector','CLLEX':'CLLEX'};
+const STALE_MONTHS=12; // fares older than this are flagged “check for updates”
 const FREE=new Set(['CLLEX']);
 const SYSTEMS=[...new Set(Object.values(SYSTEM))];
 const LS_KEY='luzon-rfid-fares-v1';
 
-const {roads,graph}=DATA;
+const {roads,graph,plazas}=DATA;
+// plaza registry: map any map label / junction name to the TRB matrix name for that system
+const ALIAS={};(plazas||[]).forEach(p=>{const m=ALIAS[p.system]||(ALIAS[p.system]={});[p.name,...p.aliases].forEach(n=>m[n.toLowerCase()]=p.name)});
+const canon=(sys,n)=>(ALIAS[sys]&&ALIAS[sys][n.toLowerCase()])||n;
 const byName=Object.fromEntries(roads.map(r=>[r.n,r]));
 const exits=graph.exits.map((e,i)=>({...e,id:i,base:e.l?e.l.replace(/\s+\([^)]*\)$/,''):null}));
 const named=exits.filter(e=>e.l);
@@ -208,11 +227,11 @@ function toFares(text){
     const sys=g('system');if(!SYSTEMS.includes(sys))throw new Error(`Line ${k+2}: unknown system “${sys}”. Use one of: ${SYSTEMS.join(', ')}`);
     if(!g('from')||!g('to'))throw new Error(`Line ${k+2}: from and to are required (use * for any)`);
     const num=v=>{if(v==='')return null;const x=+v.replace(/[₱,\s]/g,'');if(isNaN(x)||x<0)throw new Error(`Line ${k+2}: “${v}” is not a valid amount`);return x};
-    return {system:sys,from:g('from'),to:g('to'),c:[null,num(g('class1')),num(g('class2')),num(g('class3'))],note:g('note')}});
+    return {system:sys,from:canon(sys,g('from')),to:g('to')==='*'?'*':canon(sys,g('to')),c:[null,num(g('class1')),num(g('class2')),num(g('class3'))],eff:g('effective'),note:g('note')}});
 }
 function toCSV(){
   const esc=v=>v==null?'':/[",\n]/.test(String(v))?'"'+String(v).replace(/"/g,'""')+'"':String(v);
-  return 'system,from,to,class1,class2,class3,note\n'+fares.map(f=>[f.system,f.from,f.to,f.c[1],f.c[2],f.c[3],f.note].map(esc).join(',')).join('\n')+'\n';
+  return 'system,from,to,class1,class2,class3,effective,note\n'+fares.map(f=>[f.system,f.from,f.to,f.c[1],f.c[2],f.c[3],f.eff,f.note].map(esc).join(',')).join('\n')+'\n';
 }
 async function loadFares(){
   baseText=document.getElementById('fares-default').textContent;
@@ -221,11 +240,14 @@ async function loadFares(){
   try{fares=toFares(local||baseText);if(local)fareSource='edited in this browser'}catch(e){fares=toFares(baseText)}
 }
 function saveLocal(){try{localStorage.setItem(LS_KEY,toCSV())}catch(_){}fareSource='edited in this browser'}
-function fareStatus(){const miss=fares.filter(f=>f.c[cls]==null).length;
-  document.getElementById('fareStatus').innerHTML=`<b style="color:var(--ink)">${fares.length} fare rows</b> · source: ${fareSource}${miss?` · ${miss} have no class ${cls} amount`:''}`}
+function fareStatus(){
+  const by={};fares.forEach(f=>{const b=by[f.system]||(by[f.system]={n:0,eff:'',stale:false});b.n++;if((f.eff||'')>b.eff)b.eff=f.eff||'';if(stale(f))b.stale=true});
+  const list=SYSTEMS.filter(s=>!FREE.has(s)).map(s=>{const b=by[s];return b?`<li>${s}: ${b.n} pairs · ${b.eff||'no date'}${b.stale?' · <b style="color:var(--warn)">check for update</b>':''}</li>`:`<li>${s}: <span style="color:var(--warn)">no fares yet</span></li>`}).join('');
+  document.getElementById('fareStatus').innerHTML=`<b style="color:var(--ink)">${fares.length} fare pairs</b> · source: ${fareSource}<ul style="margin:6px 0 0;padding-left:18px">${list}</ul>`}
 const eq=(a,b)=>a.toLowerCase()===b.toLowerCase();
 function lookup(sys,a,b){
   if(FREE.has(sys))return {v:0,free:true};
+  a=canon(sys,a);b=canon(sys,b);
   const ok=f=>f.system===sys&&f.c[cls]!=null;
   const r=fares.find(f=>ok(f)&&((eq(f.from,a)&&eq(f.to,b))||(eq(f.from,b)&&eq(f.to,a))))
        ||fares.find(f=>ok(f)&&((f.to==='*'&&(eq(f.from,a)||eq(f.from,b)))||(f.from==='*'&&(eq(f.to,a)||eq(f.to,b)))))
@@ -252,7 +274,7 @@ function legsOf(steps,km,A,B){
   // hops under 2 km between systems are treated as untolled connections (ramps at a plaza or interchange)
   for(let i=segs.length-1;i>=0&&segs.length>1;i--){if(segs[i].km<2){const s=segs.splice(i,1)[0];const n=segs[i-1]||segs[i];n.lines.push(...s.lines)}}
   const legs=[];segs.forEach(s=>{const m=legs[legs.length-1];if(m&&m.sys===s.sys){m.km+=s.km;s.roads.forEach(r=>m.roads.add(r));m.lines.push(...s.lines)}else legs.push(s)});
-  legs.forEach((s,i)=>{s.from=i===0?A.base:`${legs[i-1].sys} junction`;s.to=i===legs.length-1?B.base:`${legs[i+1].sys} junction`;
+  legs.forEach((s,i)=>{s.from=canon(s.sys,i===0?A.base:`${legs[i-1].sys} junction`);s.to=canon(s.sys,i===legs.length-1?B.base:`${legs[i+1].sys} junction`);
     const f=lookup(s.sys,s.from,s.to);s.fare=f?f.v:null;s.free=!!(f&&f.free);s.row=f&&f.row;s.net=byName[[...s.roads][0]].net});
   return {legs,km,total:legs.reduce((a,s)=>a+(s.fare||0),0),missing:legs.filter(s=>s.fare==null).length};
 }
@@ -264,6 +286,7 @@ function tripTo(E){
   if(best>=0&&isFinite(bd)){const steps=[];let x=best;while(tree.prev[x]>=0){steps.push([tree.prev[x],tree.pe[x]]);x=tree.prev[x]}steps.reverse();res=legsOf(steps,bd,fromE,E)}
   cache.set(E.id,res);return res;
 }
+const stale=r=>{if(!r)return false;if(/outdated/i.test(r.note||''))return true;const m=(r.eff||'').match(/(\d{4})-(\d{2})/);if(!m)return false;const d=new Date(+m[1],+m[2]-1,1);return (Date.now()-d)/2.63e9>STALE_MONTHS};
 const peso=v=>'₱'+(Math.round(v*100)/100).toLocaleString('en-PH');
 const fareText=t=>t.missing===0?peso(t.total):t.total>0?peso(t.total)+' + ?':'₱?';
 const fareCls=t=>t.missing===0?'ok':t.total>0?'part':'';
@@ -308,10 +331,10 @@ const roadLayers=roads.slice().sort((a,b)=>ord(a)-ord(b)).map(r=>{
 const RL={'TPLEX':[15.85,120.63],'SCTEX':[14.97,120.40],'NLEX':[14.90,120.80],'CLLEX':[15.52,120.80],'SLEX':[14.28,121.10],'STAR Tollway':[13.95,121.16],'CALAX':[14.30,120.95],'CAVITEX':[14.47,120.93]};
 const roadLabels=Object.entries(RL).map(([n,p])=>({r:byName[n],t:L.tooltip({permanent:true,direction:'right',className:'rl',offset:[6,0]}).setLatLng(p).setContent(`<span style="color:${COLORS[byName[n].net]}">${n==='STAR Tollway'?'STAR':n}</span>`)}));
 const routeLayer=L.layerGroup().addTo(map);
-const plazaLayers=exits.map(e=>{const m=L.circleMarker([e.y,e.x],{pane:'plazas',radius:5,weight:2.5,color:COLORS[e.net],fillColor:'#fff',fillOpacity:1});m.on('click',()=>openPlaza(e));return {e,m}});
+const plazaLayers=exits.map(e=>{const m=L.circleMarker([e.y,e.x],{pane:'plazas',radius:5,weight:2.5,color:COLORS[e.net],fillColor:'#fff',fillOpacity:1,dashArray:e.a?'3 2':null});m.on('click',()=>openPlaza(e));return {e,m}});
 function openPlaza(e){
   const t=fromE&&e!==fromE?tripTo(e):null;
-  let html=`<b>${e.l||'Unnamed toll plaza'}</b><br>${DISPLAY(e.r)} · <span style="color:${COLORS[e.net]};font-weight:600">${e.net}</span>`;
+  let html=`<b>${e.l||'Unnamed toll plaza'}</b><br>${DISPLAY(e.r)} · <span style="color:${COLORS[e.net]};font-weight:600">${e.net}</span>${e.a?'<br><span style="color:#8a5a00">Approximate position</span>':''}`;
   if(t)html+=`<br>From ${fromE.l}: <span class="fare ${fareCls(t)}" style="margin:0">${fareText(t)}</span> · ${t.km.toFixed(0)} km`;
   html+=e.l?`<div class="acts"><button class="btn sm" data-a="from">Entry here</button><button class="btn sm primary" data-a="to">${fromE&&e!==fromE?'Exit here · breakdown':'Exit here'}</button></div>`:'<div style="color:#777;margin-top:4px">No name in the map data, so it can’t be used as an entry or exit.</div>';
   const p=L.popup({offset:[0,-4]}).setLatLng([e.y,e.x]).setContent(html).openOn(map);
@@ -367,13 +390,13 @@ function renderResult(){
    <div class="top" style="margin-top:2px"><span class="big">${fareText(route)}</span><span class="small">${route.missing?route.missing+' fare'+(route.missing>1?'s':'')+' missing':'total toll, one way'}</span></div>
    <div class="verdict ${v[0]}">${v[1]}</div>
    <ul class="legs">${route.legs.map((s,i)=>`<li><div class="l1"><span><span class="dot" style="background:${COLORS[s.net]}"></span><b>${s.sys}</b> <span class="small">· ${s.net} · ${s.km.toFixed(1)} km</span></span><span class="amt ${s.fare==null?'miss':''}">${s.fare==null?'₱?':s.free?'free':peso(s.fare)}</span></div>
-     <div class="l2">${s.from} → ${s.to}${s.row&&(s.row.from==='*'||s.row.to==='*')?' · flat rate':''}${s.row&&s.row.note?' · '+s.row.note:''}</div>
+     <div class="l2">${s.from} → ${s.to}${s.row&&(s.row.from==='*'||s.row.to==='*')?' · flat rate':''}${s.row&&s.row.eff?' · as of '+s.row.eff:''}${stale(s.row)?' · <b style="color:var(--warn)">may be outdated</b>':''}${s.row&&s.row.note?`<br><span title="${s.row.note.replace(/"/g,'&quot;')}">Source: ${s.row.note.length>90?s.row.note.slice(0,90)+'…':s.row.note}</span>`:''}</div>
      ${s.fare==null?`<div class="addfare"><input type="number" min="0" step="0.01" inputmode="decimal" placeholder="Class ${cls} ₱" data-i="${i}" aria-label="Class ${cls} fare for ${s.sys}, ${s.from} to ${s.to}"><button class="btn sm" data-save="${i}">Save fare</button></div>`:''}</li>`).join('')}</ul></div>`;
   el.querySelectorAll('[data-save]').forEach(b=>b.onclick=()=>{
     const i=+b.dataset.save,inp=el.querySelector(`input[data-i="${i}"]`),val=parseFloat(inp.value);
     if(isNaN(val)||val<0){inp.style.outline='2px solid #c0392b';inp.focus();return}
     const s=route.legs[i];let row=fares.find(f=>f.system===s.sys&&((eq(f.from,s.from)&&eq(f.to,s.to))||(eq(f.from,s.to)&&eq(f.to,s.from))));
-    if(!row){row={system:s.sys,from:s.from,to:s.to,c:[null,null,null,null],note:'added in browser'};fares.push(row)}
+    if(!row){row={system:s.sys,from:s.from,to:s.to,c:[null,null,null,null],eff:new Date().toISOString().slice(0,7),note:'added in browser'};fares.push(row)}
     row.c[cls]=val;saveLocal();recompute()});
   el.querySelectorAll('.addfare input').forEach(inp=>inp.addEventListener('keydown',e=>{if(e.key==='Enter')el.querySelector(`[data-save="${inp.dataset.i}"]`).click()}));
 }
@@ -430,12 +453,51 @@ document.getElementById('impF').onchange=async e=>{const f=e.target.files[0];if(
 document.getElementById('expF').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([toCSV()],{type:'text/csv'}));a.download='fares.csv';document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500)};
 document.getElementById('rstF').onclick=()=>{if(!confirm('Discard fares edited in this browser and go back to the published table?'))return;try{localStorage.removeItem(LS_KEY)}catch(_){}fares=toFares(baseText);fareSource=location.protocol.startsWith('http')&&baseText!==document.getElementById('fares-default').textContent?'fares.csv':'built-in';recompute()};
 
+/* ---------- paste a TRB matrix ---------- */
+const mdlg=document.getElementById('mdlg'),mSys=document.getElementById('mSys');
+mSys.innerHTML=SYSTEMS.filter(s=>!FREE.has(s)).map(s=>`<option>${s}</option>`).join('');
+function parseMatrix(text){
+  const lines=text.replace(/\r/g,'').split('\n').filter(l=>l.trim());
+  const sep=lines.some(l=>l.includes('\t'))?'\t':',';
+  const split=l=>sep===','?(parseCSV(l+'\n')[0]||[]):l.split('\t');
+  const head=split(lines[0]).map(x=>x.trim());const entries=head.slice(1);
+  const pairs=[];
+  lines.slice(1).forEach(l=>{const r=split(l);const ex=(r[0]||'').trim();if(!ex)return;
+    r.slice(1).forEach((v,i)=>{const en=entries[i];v=(v||'').replace(/[₱,\s]/g,'');if(!en||!v||/^[-–—]+$/.test(v)||isNaN(+v))return;if(en.toLowerCase()===ex.toLowerCase())return;pairs.push([en,ex,+v])})});
+  return {entries,pairs};
+}
+function checkMatrix(){
+  const sys=mSys.value,{pairs}=parseMatrix(document.getElementById('mBox').value);
+  const known=new Set(Object.keys(ALIAS[sys]||{}));named.forEach(e=>{if(SYSTEM[e.r]===sys)known.add(e.base.toLowerCase())});
+  const names=[...new Set(pairs.flatMap(p=>[p[0],p[1]]))];const unk=names.filter(n=>!known.has(n.toLowerCase()));
+  document.getElementById('mPrev').innerHTML=pairs.length?`<b>${pairs.length} fares</b> found between ${names.length} plazas.${unk.length?`<br><span style="color:var(--warn)">Not matched to a map plaza (they're saved, but won't price a trip until added to <code>data/plazas.csv</code> as an alias): ${unk.join(', ')}</span>`:' All names match map plazas.'}`:'<span style="color:#c0392b">No fares found. The first row must list entry plazas and the first column exit plazas.</span>';
+  return pairs;
+}
+document.getElementById('pasteM').onclick=()=>{document.getElementById('mPrev').textContent='';mdlg.style.display='flex';document.getElementById('mBox').focus()};
+document.getElementById('mX').onclick=()=>mdlg.style.display='none';
+mdlg.addEventListener('keydown',e=>{if(e.key==='Escape')mdlg.style.display='none'});
+document.getElementById('mChk').onclick=checkMatrix;
+document.getElementById('mSave').onclick=()=>{
+  const pairs=checkMatrix();if(!pairs.length)return;
+  const sys=mSys.value,c=+document.getElementById('mCls').value,eff=document.getElementById('mEff').value,src=document.getElementById('mSrc').value.trim()||'pasted matrix';
+  if(document.getElementById('mRepl').checked)fares.forEach(f=>{if(f.system===sys)f.c[c]=null});
+  pairs.forEach(([a,b,v])=>{a=canon(sys,a);b=canon(sys,b);let r=fares.find(f=>f.system===sys&&((eq(f.from,a)&&eq(f.to,b))||(eq(f.from,b)&&eq(f.to,a))));
+    if(!r){r={system:sys,from:a,to:b,c:[null,null,null,null],eff,note:src};fares.push(r)}r.c[c]=v;if(eff)r.eff=eff;r.note=src});
+  fares=fares.filter(f=>f.c[1]!=null||f.c[2]!=null||f.c[3]!=null);
+  saveLocal();mdlg.style.display='none';recompute();
+  // also hand back the matrix as a repo file, so fares/matrices stays the single source of truth
+  const txt=document.getElementById('mBox').value.replace(/\r/g,'').split('\n').filter(l=>l.trim()).map(l=>l.includes('\t')?l.split('\t').map(x=>{x=x.trim();return /[",]/.test(x)?'"'+x.replace(/"/g,'""')+'"':x}).join(','):l).join('\n');
+  const file=`# system: ${sys}\n# class: ${c}\n# effective: ${eff}\n# source: ${src}\n${txt}\n`;
+  if(document.getElementById('mDl').checked){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([file],{type:'text/csv'}));a.download=`${sys}.class${c}.csv`;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500)}
+};
+
 function writeHash(){const p=new URLSearchParams();if(fromE)p.set('from',fromE.l);if(toE)p.set('to',toE.l);if(cls!==1)p.set('class',cls);const h=p.toString();history.replaceState(null,'',h?'#'+h:location.pathname+location.search)}
 function readHash(){const p=new URLSearchParams(location.hash.slice(1));const c=+p.get('class');
   if(c>=1&&c<=3){cls=c;document.querySelectorAll('#cls button').forEach(x=>x.classList.toggle('on',+x.dataset.c===c))}
   fromE=named.find(e=>e.l===p.get('from'))||null;toE=named.find(e=>e.l===p.get('to'))||null;fIn.value=fromE?fromE.l:'';tIn.value=toE?toE.l:'';
   recompute();if(route)setTimeout(fitRoute,100);else if(fromE)map.setView([fromE.y,fromE.x],10)}
 loadFares().then(readHash);
+addEventListener('hashchange',readHash);
 })();
 </script>
 </body>

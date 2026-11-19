@@ -90,6 +90,24 @@ while True:
             adj[i][j]=(best[0],r); adj[j][i]=(best[0],r); print('joined',sorted({rr for m in members for rr in nroad[m]}),'via',round(best[0],2),'km to',sorted(nroad[j])); merged=True; break
     if not merged: break
     seen,n=comps()
+# dead ends that are close to another road but far from it along the graph (missing ramps): connect them
+def gdist(a,b,limit):
+    dist={a:0};pq=[(0,a)]
+    while pq:
+        d,u=heapq.heappop(pq)
+        if u==b: return d
+        if d>limit: return None
+        for v,(L,_) in adj[u].items():
+            if d+L<dist.get(v,1e9): dist[v]=d+L; heapq.heappush(pq,(d+L,v))
+    return None
+detour=0
+for i in list({e for e,_ in ends}):
+    j,dd=near(i,0.8 if len(adj[i])==1 else 0.35,lambda j: j in adj and len(adj[j])>=1)
+    if j is None: continue
+    g=gdist(i,j,max(4*dd+1.5,3))
+    if g is None:
+        r=sorted(nroad[j])[0]; adj[i][j]=(dd,r); adj[j][i]=(dd,r); detour+=1
+print('detour stitches',detour)
 seen,n=comps(); sizes=collections.Counter(seen.values()); print('stitched',stitched,'components after',n, sizes.most_common(6))
 for c,_ in sizes.most_common(): print(c, sorted({r for i,cc in seen.items() if cc==c for r in nroad[i]}))
 # exits
@@ -118,6 +136,25 @@ for f in d['features']:
     k=(name or f'_{best}', road)
     e=ex.setdefault(k,{'name':name,'road':road,'net':net,'pts':[],'nodes':set()})
     e['pts'].append((x,y)); e['nodes'].add(best)
+# plazas from data/plazas.csv that are missing or unnamed in OSM: snap onto their road
+import csv, os
+preg=os.path.join(os.path.dirname(os.path.abspath(__file__)),'..','data','plazas.csv')
+if os.path.exists(preg):
+    lines_=[l for l in open(preg,encoding='utf-8') if l.strip() and not l.startswith('#')]
+    for r in csv.DictReader(lines_):
+        if not r.get('lat'): continue
+        lat,lon,road=float(r['lat']),float(r['lon']),r['road']
+        cand=[j for j in adj if road in nroad[j]]
+        j=min(cand,key=lambda j:hav((lon,lat),coords[j]))
+        # rename an unnamed OSM plaza nearby, else add a new one
+        hit=None
+        for k_,e in ex.items():
+            if e['name'] is None and e['road']==road and min(hav(coords[n],coords[j]) for n in e['nodes'])<0.6: hit=k_;break
+        if hit:
+            e=ex.pop(hit); e['name']=r['name']; e['approx']=False; ex[(r['name'],road)]=e
+        else:
+            ex[(r['name'],road)]={'name':r['name'],'road':road,'net':ROADS[road][0],'pts':[coords[j]],'nodes':{j},'approx':True}
+        print('registry plaza',r['name'],road,'renamed OSM' if hit else 'added (approx)')
 exits=[]
 for (k,road),e in ex.items():
     x=sum(p[0] for p in e['pts'])/len(e['pts']); y=sum(p[1] for p in e['pts'])/len(e['pts'])
@@ -169,6 +206,6 @@ byl={e['label']:e for e in exits if e['label']}
 for a,b in [('Balintawak','Dau'),('Balintawak','Rosario'),('Magallanes','Calamba'),('Nichols','Calamba'),('Calamba','Batangas City'),('Balintawak','Batangas City'),('Kawit','Mamplasan'),('Tipo','Rosario'),('Quezon Avenue','Alabang (Skyway)'),('Karuhatan','Sucat (CAVITEX)')]:
     A=byl.get(a) or next((e for l,e in byl.items() if l.startswith(a)),None); B=byl.get(b) or next((e for l,e in byl.items() if l.startswith(b)),None)
     print(a,'->',b, A and A['label'], B and B['label'], route(A,B) if A and B else 'missing')
-out={'nodes':N,'edges':E,'exits':[{'l':e['label'],'r':e['road'],'net':e['net'],'x':round(e['x'],5),'y':round(e['y'],5),'n':sorted(idx[i] for i in e['nodes'])} for e in exits]}
+out={'nodes':N,'edges':E,'exits':[{'l':e['label'],'r':e['road'],'net':e['net'],'x':round(e['x'],5),'y':round(e['y'],5),'n':sorted(idx[i] for i in e['nodes']),**({'a':1} if e.get('approx') else {})} for e in exits]}
 json.dump(out,open('data/graph.json','w'),separators=(',',':'))
 print(sorted(byl))
